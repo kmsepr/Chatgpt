@@ -65,7 +65,7 @@ INDEX_HTML = """
     <input id="msg" autocomplete="off" placeholder="Type message..." spellcheck="false" />
     <button id="send" aria-label="Send message">Send</button>
   </div>
-  <div style="margin-top:6px"><small>Press Enter to send</small></div>
+  <div style="margin-top:6px"><small>Press Enter or 0 to send, 5 to focus input</small></div>
 </div>
 
 <script>
@@ -89,6 +89,25 @@ msg.addEventListener('keydown', function(e){
 });
 
 sendBtn.addEventListener('click', send);
+
+// Keypad shortcuts: 5 = focus input, 0 = send message
+document.addEventListener('keydown', function(e) {
+  // If focus is on input or textarea
+  if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    if (e.key === '0') {
+      e.preventDefault();
+      send();
+    }
+    return;
+  }
+  if (e.key === '5') {
+    e.preventDefault();
+    msg.focus();
+  } else if (e.key === '0') {
+    e.preventDefault();
+    send();
+  }
+});
 
 async function send(){
   const text = msg.value.trim();
