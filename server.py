@@ -26,10 +26,34 @@ INDEX_HTML = """
   #log{height:58vh; overflow:auto; border:1px solid #ccc; padding:6px; white-space:pre-wrap; font-size:14px}
   .you{color:#003366; margin-bottom:4px}
   .bot{color:#006600; margin-bottom:6px}
-  #compose{display:flex; gap:6px; margin-top:6px}
-  #msg{flex:1; padding:6px; font-size:14px}
-  button{padding:6px 8px; font-size:14px}
-  input, button, textarea { outline-color:#888; }
+  #compose {
+    display: flex;
+    gap: 4px;           /* smaller gap for tighter layout */
+    margin-top: 6px;
+  }
+  #msg {
+    flex: 1 1 auto;     /* take as much width as possible */
+    padding: 8px 12px;  /* comfortable padding */
+    font-size: 16px;    /* bigger font */
+    min-width: 0;       /* fix shrinking issue */
+    outline-color: #888;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  button {
+    padding: 8px 12px;
+    font-size: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+    border: 1px solid #006600;
+    background: #008000;
+    color: white;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+  }
+  button:hover {
+    background-color: #005500;
+  }
   small{color:#666}
 </style>
 </head>
@@ -38,8 +62,8 @@ INDEX_HTML = """
   <header>Mini AI Chat (Groq API)</header>
   <div id="log" tabindex="0" aria-live="polite"></div>
   <div id="compose">
-    <input id="msg" autocomplete="off" placeholder="Type message..." />
-    <button id="send">Send</button>
+    <input id="msg" autocomplete="off" placeholder="Type message..." spellcheck="false" />
+    <button id="send" aria-label="Send message">Send</button>
   </div>
   <div style="margin-top:6px"><small>Press Enter to send</small></div>
 </div>
