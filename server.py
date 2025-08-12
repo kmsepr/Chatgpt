@@ -1,16 +1,15 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, session
 import os
 import requests
 
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-key")  # Change in production!
 
-# Your Groq API key — set as environment variable for safety
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
 if not GROQ_API_KEY:
     raise Exception("Set the GROQ_API_KEY environment variable")
 
-MODEL = "llama3-8b-8192"  # Groq free model, adjust if needed
+MODEL = "llama3-8b-8192"  # Adjust if needed
 
 INDEX_HTML = """
 <!doctype html>
@@ -28,14 +27,14 @@ INDEX_HTML = """
   .bot{color:#006600; margin-bottom:6px}
   #compose {
     display: flex;
-    gap: 4px;           /* smaller gap for tighter layout */
+    gap: 4px;
     margin-top: 6px;
   }
   #msg {
-    flex: 1 1 auto;     /* take as much width as possible */
-    padding: 8px 12px;  /* comfortable padding */
-    font-size: 16px;    /* bigger font */
-    min-width: 0;       /* fix shrinking issue */
+    flex: 1 1 auto;
+    padding: 8px 12px;
+    font-size: 16px;
+    min-width: 0;
     outline-color: #888;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -73,10 +72,22 @@ const log = document.getElementById('log');
 const msg = document.getElementById('msg');
 const sendBtn = document.getElementById('send');
 
+function linkify(text) {
+  // Basic URL regex (matches http, https, www)
+  const urlRegex = /(\bhttps?:\/\/[^\s<>"]+|\bwww\.[^\s<>"]+)/gi;
+  return text.replace(urlRegex, url => {
+    let href = url;
+    if (!href.startsWith('http')) {
+      href = 'http://' + href; // add http if missing
+    }
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+  });
+}
+
 function append(kind, text) {
   const el = document.createElement('div');
   el.className = kind;
-  el.textContent = (kind === 'you' ? 'You: ' : 'Bot: ') + text;
+  el.innerHTML = (kind === 'you' ? 'You: ' : 'Bot: ') + linkify(text);
   log.appendChild(el);
   log.scrollTop = log.scrollHeight;
 }
@@ -90,9 +101,7 @@ msg.addEventListener('keydown', function(e){
 
 sendBtn.addEventListener('click', send);
 
-// Keypad shortcuts: 5 = focus input, 0 = send message
 document.addEventListener('keydown', function(e) {
-  // If focus is on input or textarea
   if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
     if (e.key === '0') {
       e.preventDefault();
@@ -124,16 +133,16 @@ async function send(){
     if (!r.ok) {
       const err = await r.text();
       const last = log.lastChild;
-      if(last) last.textContent = 'Bot: [Error] ' + err;
+      if(last) last.innerHTML = 'Bot: [Error] ' + err;
       return;
     }
     const data = await r.json();
     const last = log.lastChild;
-    if(last) last.textContent = 'Bot: ' + (data.reply || '[no reply]');
+    if(last) last.innerHTML = 'Bot: ' + linkify(data.reply || '[no reply]');
     log.scrollTop = log.scrollHeight;
   } catch(e) {
     const last = log.lastChild;
-    if(last) last.textContent = 'Bot: [Network error]';
+    if(last) last.innerHTML = 'Bot: [Network error]';
   }
 }
 </script>
@@ -152,6 +161,13 @@ def chat():
     if not user_text:
         return "Empty message", 400
 
+    if "history" not in session:
+        session["history"] = [
+            {"role": "system", "content": "You are a helpful assistant."}
+        ]
+
+    session["history"].append({"role": "user", "content": user_text})
+
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -159,10 +175,7 @@ def chat():
     }
     payload = {
         "model": MODEL,
-        "messages": [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": user_text}
-        ]
+        "messages": session["history"]
     }
 
     try:
@@ -170,6 +183,9 @@ def chat():
         response.raise_for_status()
         result = response.json()
         answer = result["choices"][0]["message"]["content"].strip()
+
+        session["history"].append({"role": "assistant", "content": answer})
+
         return jsonify({"reply": answer})
     except Exception as e:
         return f"API error: {e}", 500
