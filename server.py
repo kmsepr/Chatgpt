@@ -19,16 +19,36 @@ INDEX_HTML = """
 <meta charset="utf-8">
 <title>Mini AI Chat (Groq API)</title>
 <style>
-  html,body{height:100%; margin:0; font-family:system-ui,Arial; background:#fff; color:#000}
-  .wrap{max-width:320px; margin:0 auto; padding:6px; box-sizing:border-box}
-  header{font-weight:700; font-size:16px; padding:6px 0}
-  #log{height:58vh; overflow:auto; border:1px solid #ccc; padding:6px; white-space:pre-wrap; font-size:14px}
-  .you{color:#003366; margin-bottom:4px}
-  .bot{color:#006600; margin-bottom:6px}
+  html, body {
+    height: 100%; margin: 0; font-family: system-ui, Arial; background: #fff; color: #000;
+  }
+  .wrap {
+    max-width: 600px; margin: 0 auto; padding: 12px; box-sizing: border-box;
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    font-weight: 700; font-size: 20px; padding: 12px 0;
+  }
+  #log {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 12px;
+    white-space: pre-wrap;
+    font-size: 16px;
+    line-height: 1.4;
+  }
+  .you { color: #003366; margin-bottom: 8px; }
+  .bot { color: #006600; margin-bottom: 12px; }
+  a {
+    color: #008000; text-decoration: underline;
+  }
   #compose {
-    display: flex;
-    gap: 4px;
     margin-top: 6px;
+    gap: 4px;
+    display: none; /* hidden by default */
+    flex-wrap: nowrap;
+    align-items: center;
   }
   #msg {
     flex: 1 1 auto;
@@ -39,10 +59,9 @@ INDEX_HTML = """
     border: 1px solid #ccc;
     border-radius: 4px;
   }
-  button {
+  #send {
     padding: 8px 12px;
     font-size: 16px;
-    flex-shrink: 0;
     cursor: pointer;
     border: 1px solid #006600;
     background: #008000;
@@ -50,36 +69,37 @@ INDEX_HTML = """
     border-radius: 4px;
     transition: background-color 0.2s ease;
   }
-  button:hover {
+  #send:hover {
     background-color: #005500;
   }
-  small{color:#666}
+  small {
+    color: #666;
+    margin-top: 6px;
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>Mini AI Chat (Groq API)</header>
-  <div id="log" tabindex="0" aria-live="polite"></div>
+  <div id="log" aria-live="polite" tabindex="0"></div>
   <div id="compose">
     <input id="msg" autocomplete="off" placeholder="Type message..." spellcheck="false" />
     <button id="send" aria-label="Send message">Send</button>
   </div>
-  <div style="margin-top:6px"><small>Press Enter or 0 to send, 5 to focus input</small></div>
+  <div><small>Press 5 to edit, 0 to send, Enter to send</small></div>
 </div>
 
 <script>
 const log = document.getElementById('log');
+const compose = document.getElementById('compose');
 const msg = document.getElementById('msg');
 const sendBtn = document.getElementById('send');
 
 function linkify(text) {
-  // Basic URL regex (matches http, https, www)
   const urlRegex = /(\bhttps?:\/\/[^\s<>"]+|\bwww\.[^\s<>"]+)/gi;
   return text.replace(urlRegex, url => {
     let href = url;
-    if (!href.startsWith('http')) {
-      href = 'http://' + href; // add http if missing
-    }
+    if (!href.startsWith('http')) href = 'http://' + href;
     return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>`;
   });
 }
@@ -92,7 +112,14 @@ function append(kind, text) {
   log.scrollTop = log.scrollHeight;
 }
 
-msg.addEventListener('keydown', function(e){
+function showCompose(show) {
+  compose.style.display = show ? 'flex' : 'none';
+  if (show) {
+    msg.focus();
+  }
+}
+
+msg.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     send();
@@ -102,6 +129,7 @@ msg.addEventListener('keydown', function(e){
 sendBtn.addEventListener('click', send);
 
 document.addEventListener('keydown', function(e) {
+  // If focus is on input or textarea, allow '0' to send
   if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
     if (e.key === '0') {
       e.preventDefault();
@@ -111,7 +139,7 @@ document.addEventListener('keydown', function(e) {
   }
   if (e.key === '5') {
     e.preventDefault();
-    msg.focus();
+    showCompose(true);
   } else if (e.key === '0') {
     e.preventDefault();
     send();
@@ -123,6 +151,7 @@ async function send(){
   if (!text) return;
   append('you', text);
   msg.value = '';
+  showCompose(false);
   append('bot', '...');
   try {
     const r = await fetch('/api/chat', {
