@@ -3,16 +3,16 @@ import os
 import requests
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-key")  # Change in production!
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-key")  # Change for production
 
-# --- Setup API key ---
+# --- Groq API Key ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise Exception("Set the GROQ_API_KEY environment variable first.")
 
-MODEL = "llama3-8b-8192"  # Change if needed
+MODEL = "llama3-8b-8192"  # You may change to your preferred model
 
-# --- Minimal UI HTML ---
+# --- Minimal HTML UI ---
 INDEX_HTML = """
 <!doctype html>
 <html>
@@ -88,7 +88,7 @@ const msg = document.getElementById('msg');
 const sendBtn = document.getElementById('send');
 
 function linkify(text) {
-  const urlRegex = /(\\bhttps?:\\/\\/[^\\s<>"]+|\\bwww\\.[^\\s<>"]+)/gi;
+  const urlRegex = /(\\\\bhttps?:\\\\/\\\\/[^\\\\s<>"]+|\\\\bwww\\\\.[^\\\\s<>"]+)/gi;
   return text.replace(urlRegex, url => {
     let href = url;
     if (!href.startsWith('http')) href = 'http://' + href;
@@ -124,4 +124,70 @@ async function send(){
     }
     const data = await r.json();
     const last = log.lastChild;
-    if(last) last.innerHTML = '
+    if(last) last.innerHTML = 'Bot: ' + linkify(data.reply || '[no reply]');
+    log.scrollTop = log.scrollHeight;
+  } catch(e) {
+    const last = log.lastChild;
+    if(last) last.innerHTML = 'Bot: [Network error]';
+  }
+}
+
+sendBtn.addEventListener('click', send);
+msg.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+</script>
+</body>
+</html>
+"""
+
+@app.route("/")
+def index():
+    return render_template_string(INDEX_HTML)
+
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    data = request.get_json(force=True) or {}
+    user_text = data.get("text", "").strip()
+    if not user_text:
+        return "Empty message", 400
+
+    # Initialize conversation history
+    if "history" not in session:
+        session["history"] = [
+            {"role": "system", "content": "You are a helpful assistant."}
+        ]
+
+    # Append user input
+    session["history"].append({"role": "user", "content": user_text})
+
+    # Request to Groq API
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": MODEL,
+        "messages": session["history"]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=20)
+        response.raise_for_status()
+        result = response.json()
+        answer = result["choices"][0]["message"]["content"].strip()
+
+        # Append assistant reply to history
+        session["history"].append({"role": "assistant", "content": answer})
+
+        return jsonify({"reply": answer})
+    except Exception as e:
+        return f"API error: {e}", 500
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
