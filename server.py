@@ -5,26 +5,24 @@ import requests
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "super-secret-key")  # Change for production
 
-# --- Groq API Key ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise Exception("Set the GROQ_API_KEY environment variable first.")
 
 MODEL = "llama3-8b-8192"  # You may change to your preferred model
 
-# --- Minimal HTML UI ---
 INDEX_HTML = """
 <!doctype html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
-<title></title>
+<title>Chat - HMD110 Keypad Friendly</title>
 <style>
   html, body {
     height: 100%;
     margin: 0;
-    font-family: system-ui, Arial;
+    font-family: system-ui, Arial, sans-serif;
     background: #fff;
     color: #000;
     display: flex;
@@ -36,9 +34,10 @@ INDEX_HTML = """
     padding: 12px;
     box-sizing: border-box;
     white-space: pre-wrap;
-    font-size: 16px;
-    line-height: 1.4;
+    font-size: 18px;
+    line-height: 1.5;
     border: none;
+    outline: none;
   }
   .you { color: #003366; margin-bottom: 8px; }
   .bot { color: #006600; margin-bottom: 12px; }
@@ -46,49 +45,89 @@ INDEX_HTML = """
     color: #008000;
     text-decoration: underline;
   }
-  #compose {
-    display: flex;
-    gap: 4px;
-    padding: 8px;
+
+  #instructions {
+    font-size: 14px;
+    background: #eee;
+    padding: 6px 10px;
     border-top: 1px solid #ccc;
-    background: #fff;
+    user-select: none;
+  }
+
+  #inputOverlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: none;  /* Hidden initially */
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  #inputBox {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    width: 90%;
+    max-width: 400px;
+    box-sizing: border-box;
+    display: flex;
+    gap: 8px;
   }
   #msg {
     flex: 1 1 auto;
+    font-size: 18px;
     padding: 8px 12px;
-    font-size: 16px;
-    outline-color: #888;
     border: 1px solid #ccc;
     border-radius: 4px;
+    outline-color: #008000;
   }
-  #send {
-    padding: 8px 12px;
-    font-size: 16px;
+  #sendBtn, #cancelBtn {
+    font-size: 18px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 4px;
     cursor: pointer;
-    border: 1px solid #006600;
+    user-select: none;
+  }
+  #sendBtn {
     background: #008000;
     color: white;
-    border-radius: 4px;
   }
-  #send:hover {
-    background: #005500;
+  #sendBtn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  #cancelBtn {
+    background: #cc0000;
+    color: white;
   }
 </style>
 </head>
 <body>
   <div id="log" aria-live="polite" tabindex="0"></div>
-  <div id="compose">
-    <input id="msg" autocomplete="off" placeholder="Type message..." spellcheck="false" />
-    <button id="send" aria-label="Send message">Send</button>
+  <div id="instructions">
+    Use keypad:<br>
+    [5] Toggle message input &nbsp;&nbsp; [0] Send &nbsp;&nbsp; [9] Cancel input <br>
+    [2]/[8] Scroll Up/Down
+  </div>
+
+  <div id="inputOverlay" role="dialog" aria-modal="true" aria-label="Message input">
+    <div id="inputBox">
+      <input id="msg" type="text" autocomplete="off" spellcheck="false" maxlength="200" aria-label="Message input" />
+      <button id="sendBtn" disabled>Send (0)</button>
+      <button id="cancelBtn">Cancel (9)</button>
+    </div>
   </div>
 
 <script>
 const log = document.getElementById('log');
-const msg = document.getElementById('msg');
-const sendBtn = document.getElementById('send');
+const inputOverlay = document.getElementById('inputOverlay');
+const msgInput = document.getElementById('msg');
+const sendBtn = document.getElementById('sendBtn');
+const cancelBtn = document.getElementById('cancelBtn');
 
 function linkify(text) {
-  const urlRegex = /(\\\\bhttps?:\\\\/\\\\/[^\\\\s<>"]+|\\\\bwww\\\\.[^\\\\s<>"]+)/gi;
+  const urlRegex = /(\\bhttps?:\\/\\/[^\\s<>"]+|\\bwww\\.[^\\s<>"]+)/gi;
   return text.replace(urlRegex, url => {
     let href = url;
     if (!href.startsWith('http')) href = 'http://' + href;
@@ -104,11 +143,36 @@ function append(kind, text) {
   log.scrollTop = log.scrollHeight;
 }
 
-async function send(){
-  const text = msg.value.trim();
+function openInput() {
+  inputOverlay.style.display = 'flex';
+  msgInput.value = '';
+  sendBtn.disabled = true;
+  msgInput.focus();
+}
+
+function closeInput() {
+  inputOverlay.style.display = 'none';
+  msgInput.value = '';
+  sendBtn.disabled = true;
+  log.focus();
+}
+
+sendBtn.addEventListener('click', () => {
+  sendMessage();
+});
+cancelBtn.addEventListener('click', () => {
+  closeInput();
+});
+
+msgInput.addEventListener('input', () => {
+  sendBtn.disabled = msgInput.value.trim() === '';
+});
+
+async function sendMessage() {
+  const text = msgInput.value.trim();
   if (!text) return;
   append('you', text);
-  msg.value = '';
+  closeInput();
   append('bot', '...');
   try {
     const r = await fetch('/api/chat', {
@@ -132,13 +196,35 @@ async function send(){
   }
 }
 
-sendBtn.addEventListener('click', send);
-msg.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    send();
+document.body.addEventListener('keydown', (e) => {
+  // console.log(e.key);
+  if (inputOverlay.style.display === 'flex') {
+    // Input overlay open
+    if (e.key === '0') {  // Send
+      e.preventDefault();
+      if (!sendBtn.disabled) sendMessage();
+    } else if (e.key === '9' || e.key === '5') { // Cancel or toggle input box
+      e.preventDefault();
+      closeInput();
+    }
+  } else {
+    // Input overlay closed
+    if (e.key === '5') {
+      e.preventDefault();
+      openInput();
+    } else if (e.key === '2') {
+      e.preventDefault();
+      log.scrollBy(0, -40);
+    } else if (e.key === '8') {
+      e.preventDefault();
+      log.scrollBy(0, 40);
+    }
   }
 });
+
+window.onload = () => {
+  log.focus();
+};
 </script>
 </body>
 </html>
@@ -155,16 +241,13 @@ def chat():
     if not user_text:
         return "Empty message", 400
 
-    # Initialize conversation history
     if "history" not in session:
         session["history"] = [
             {"role": "system", "content": "You are a helpful assistant."}
         ]
 
-    # Append user input
     session["history"].append({"role": "user", "content": user_text})
 
-    # Request to Groq API
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -180,10 +263,7 @@ def chat():
         response.raise_for_status()
         result = response.json()
         answer = result["choices"][0]["message"]["content"].strip()
-
-        # Append assistant reply to history
         session["history"].append({"role": "assistant", "content": answer})
-
         return jsonify({"reply": answer})
     except Exception as e:
         return f"API error: {e}", 500
