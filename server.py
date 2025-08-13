@@ -6,7 +6,6 @@ app = Flask(__name__)
 
 # Your Groq API key — set as environment variable for safety
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
 if not GROQ_API_KEY:
     raise Exception("Set the GROQ_API_KEY environment variable")
 
@@ -20,17 +19,68 @@ INDEX_HTML = """
 <meta charset="utf-8">
 <title>Mini AI Chat (Groq API)</title>
 <style>
-  html,body{height:100%; margin:0; font-family:system-ui,Arial; background:#fff; color:#000}
-  .wrap{max-width:320px; margin:0 auto; padding:6px; box-sizing:border-box}
-  header{font-weight:700; font-size:16px; padding:6px 0}
-  #log{height:58vh; overflow:auto; border:1px solid #ccc; padding:6px; white-space:pre-wrap; font-size:14px}
-  .you{color:#003366; margin-bottom:4px}
-  .bot{color:#006600; margin-bottom:6px}
-  #compose{display:flex; gap:6px; margin-top:6px}
-  #msg{flex:1; padding:6px; font-size:14px}
-  button{padding:6px 8px; font-size:14px}
-  input, button, textarea { outline-color:#888; }
-  small{color:#666}
+  html,body {
+    height:100%;
+    margin:0;
+    font-family:system-ui,Arial;
+    background:#fff;
+    color:#000;
+  }
+  .wrap {
+    max-width:320px;
+    margin:0 auto;
+    padding:6px;
+    box-sizing:border-box;
+  }
+  header {
+    font-weight:700;
+    font-size:16px;
+    padding:6px 0;
+  }
+  #log {
+    height:58vh;
+    overflow:auto;
+    border:1px solid #ccc;
+    padding:6px;
+    white-space:pre-wrap;
+    font-size:14px;
+  }
+  .you {
+    color:#003366;
+    margin-bottom:4px;
+  }
+  .bot {
+    color:#006600;
+    margin-bottom:6px;
+  }
+  #compose {
+    display:flex;
+    flex-direction:column; /* stack input & button */
+    gap:6px;
+    margin-top:6px;
+  }
+  #msg {
+    flex:1;
+    padding:6px;
+    font-size:14px;
+  }
+  button {
+    padding:10px;
+    font-size:16px;
+    background:#007bff;
+    color:#fff;
+    border:none;
+    border-radius:4px;
+  }
+  button:active {
+    background:#0056b3;
+  }
+  input, button, textarea {
+    outline-color:#888;
+  }
+  small {
+    color:#666;
+  }
 </style>
 </head>
 <body>
