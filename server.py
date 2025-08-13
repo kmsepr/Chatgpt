@@ -119,30 +119,47 @@ sendBtn.addEventListener('click', send);
 async function send(){
   const text = msg.value.trim();
   if (!text) return;
+  
   append('you', text);
   msg.value = '';
-  append('bot', '...');
+  
+  // Append placeholder and keep reference
+  const botEl = document.createElement('div');
+  botEl.className = 'bot';
+  botEl.textContent = 'Bot: ...';
+  log.appendChild(botEl);
+  log.scrollTop = botEl.offsetTop;  // scroll to start of bot message
+
   try {
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({text})
     });
+
     if (!r.ok) {
       const err = await r.text();
-      const last = log.lastChild;
-      if(last) last.textContent = 'Bot: [Error] ' + err;
+      botEl.textContent = 'Bot: [Error] ' + err;
+      log.scrollTop = botEl.offsetTop;
       return;
     }
+
     const data = await r.json();
-    const last = log.lastChild;
-    if(last) last.textContent = 'Bot: ' + (data.reply || '[no reply]');
-    log.scrollTop = log.scrollHeight;
+    botEl.textContent = 'Bot: ' + (data.reply || '[no reply]');
+    log.scrollTop = botEl.offsetTop;  // scroll to start of reply
   } catch(e) {
-    const last = log.lastChild;
-    if(last) last.textContent = 'Bot: [Network error]';
+    botEl.textContent = 'Bot: [Network error]';
+    log.scrollTop = botEl.offsetTop;
   }
 }
+
+// 🔹 Focus input box when 5 key is pressed (keypad or main)
+document.addEventListener('keydown', function(e) {
+  if (e.key === '5') {
+    e.preventDefault();
+    msg.focus();
+  }
+});
 </script>
 </body>
 </html>
