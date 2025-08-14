@@ -60,7 +60,8 @@ function append(kind, text) {
   while (log.children.length > 20) {
     log.removeChild(log.firstChild);
   }
-  log.scrollTop = log.scrollHeight;
+  // Always scroll to new element's top
+  el.scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
 document.getElementById('send').onclick = send;
@@ -86,7 +87,7 @@ async function send(){
   botEl.className = 'bot';
   botEl.textContent = 'Bot: ...';
   log.appendChild(botEl);
-  log.scrollTop = log.scrollHeight;
+  botEl.scrollIntoView({behavior: 'smooth', block: 'start'}); // Focus bot start
 
   try {
     const r = await fetch('/api/chat', {
@@ -103,7 +104,7 @@ async function send(){
   } catch {
     botEl.textContent = 'Bot: [Network error]';
   }
-  log.scrollTop = log.scrollHeight;
+  botEl.scrollIntoView({behavior: 'smooth', block: 'start'}); // Keep showing start
 }
 
 // Focus box with key 5
